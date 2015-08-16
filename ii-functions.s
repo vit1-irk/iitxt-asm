@@ -18,6 +18,8 @@
 .globl get_file_contents, get_memory, fsize, strlen, quit, getLocalEcho, getRawMsg
 .type get_file_contents @function
 .type get_memory @function
+.type get_break @function
+.type set_break @function
 .type fsize @function
 .type strlen @function
 .type quit @function
@@ -26,15 +28,26 @@
 
 .section .text
 
-get_memory:
+get_break:
 	movl $45, %eax
 	movl $0, %ebx
 	int $0x80
-	
-	addl 4(%esp), %eax
-	movl %eax, %ebx
+	ret
+
+set_break:
 	movl $45, %eax
+	movl 4(%esp), %ebx
 	int $0x80
+	ret
+
+get_memory:
+	call get_break
+	addl 4(%esp), %eax
+
+	pushl %eax
+	call set_break
+	addl $4, %esp
+
 	cmpl $0, %eax
 	jl exit
 	subl 4(%esp), %eax
@@ -56,18 +69,12 @@ strlen:
 	ret
 	
 fsize:
-	pushl %ebp
-	movl %esp, %ebp
-
 	movl $106, %eax
-	movl 8(%ebp), %ebx
+	movl 4(%esp), %ebx
 	movl $stt, %ecx
 	int $0x80
 
 	movl 20(%ecx), %eax
-
-	movl %ebp, %esp
-	popl %ebp
 	ret
 
 get_file_contents:

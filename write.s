@@ -45,7 +45,6 @@
 .type gettime @function
 .type gen_filename @function
 .type asciidec_to_bin @function
-.type write_template @function
 .type openEditor @function
 .globl main
 .section .text
