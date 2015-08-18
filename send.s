@@ -55,18 +55,30 @@ main:
 	movl $0, %esi
 	int $0x80
 
+	pushl %ebx
+
 	movl 44(%edx), %eax # сохраняем размер файла в out/
 	movl %eax, last_size
 	
 	addl first_break, %eax # выделяем память с самого начала, ненужное отсекаем
 	pushl %eax
 	call set_break
-	addl $4, %eax
+	addl $4, %esp
 
 	movl $295, %eax # открываем файл в out/, сисколл openat
+	popl %ebx # дескриптор директории
+	movl $dirent+10, %ecx
+	movl $0, %edx
+	int $0x80
+	
+	movl %eax, %ebx
+	movl $3, %eax
+	movl first_break, %ecx
+	movl last_size, %edx
+	int $0x80
+	
+	# теперь по адресу first_break находится нужный тосс, который нам отправлять
 	# продолжение следует
-	# ну напишу скоро, напишу =)
-	# ещё с запросами и base64 возиться потом, а прочитать файл не проблема
 
 	jmp reading_filenames # читаем дальше
 
