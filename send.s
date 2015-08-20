@@ -2,11 +2,10 @@
 # .include "b64.s"
 .include "network-functions.s"
 .section .data
-	filename:
-		.ascii "out/"
-		.rept 40
-		.byte 0
-		.endr
+	tossesdir:
+		.ascii "out/\0"
+	sentdir:
+		.ascii "sent/\0"
 	station:
 		.ascii "http://alicorn.tk/ii/ii-point.php?q=/u/point\0"
 	request_1:
@@ -19,6 +18,8 @@
 	.lcomm b64_pointer, 4
 	.lcomm first_break, 4
 	.lcomm second_break, 4
+	.lcomm tossesdir_descriptor, 4
+	.lcomm sentdir_descriptor, 4
 	
 # .type  @function
 .globl main
@@ -30,16 +31,22 @@ main:
 
 	# открываем директорию
 	movl $5, %eax
-	movl $filename, %ebx
+	movl $tossesdir, %ebx
 	movl $00200000, %ecx # флаг O_DIRECTORY
 	movl $0666, %edx
 	int $0x80
 
-	pushl %eax # дескриптор директории out/
+	movl %eax, tossesdir_descriptor # дескриптор директории out/
+
+	movl $5, %eax # открываем директорию отправленных
+	movl $sentdir, %ebx
+	int $0x80
+
+	movl %eax, sentdir_descriptor # sent/
 
 	reading_filenames:
 
-	movl (%esp), %ebx
+	movl tossesdir_descriptor, %ebx
 	movl $89, %eax # readdir
 	movl $dirent, %ecx
 	movl $0, %edx
@@ -54,7 +61,7 @@ main:
 
 	# здесь начинаем основной код
 	movl $300, %eax # fstatat;
-	movl (%esp), %ebx
+	movl tossesdir_descriptor, %ebx
 	movl $dirent+10, %ecx
 	movl $stt, %edx
 	movl $0, %esi
@@ -76,11 +83,14 @@ main:
 	movl $0, %edx
 	int $0x80
 	
-	movl %eax, %ebx
+	movl %eax, %ebx # читаем информацию из файла
 	movl $3, %eax
 	movl first_break, %ecx
 	movl last_size, %edx
 	int $0x80
+
+	movl $6, %eax
+	int $0x80 # закрываем файл
 	
 	# теперь по адресу first_break находится нужный тосс, который нам отправлять
 	pushl first_break
@@ -108,30 +118,51 @@ main:
 	addl request_size, %ebx
 
 	pushl %ebx
-	call get_memory
+	call get_memory # выделяем память для post-запроса
 	addl $4, %esp
 	
 	movl %eax, second_break
 	
 	# делаем подобное strcat
+	# 1 - для запроса
 	movl $request_1, %esi
-	movl $second_break, %edi
+	movl second_break, %edi
 	movl request_size, %ecx
 	rep movsb
 	
+	# 2 - для base64-сообщения
 	movl b64_pointer, %esi
-	movl $second_break, %edi
+	movl second_break, %edi
 	addl request_size, %edi
 	movl b64_size, %ecx
 	rep movsb
 
-	# продолжение следует
-	pushl $second_break
+	# отправляем post-запрос
+	pushl second_break
 	pushl $station
 	call send_post
 	addl $8, %esp
 
+	# будем считать, что post сработал нормально
+	# теперь перемещаем сообщение из out/ в sent/
+	# используем сисколл renameat
+	movl $302, %eax
+	movl tossesdir_descriptor, %ebx
+	movl $dirent+10, %ecx
+	movl sentdir_descriptor, %edx
+	movl %ecx, %esi
+	int $0x80
+
 	jmp reading_filenames # читаем дальше
 
 exit:
+	# закрываем наши директории
+	movl $6, %eax
+	movl tossesdir_descriptor, %ebx
+	int $0x80
+
+	movl $6, %eax
+	movl sentdir_descriptor, %ebx
+	int $0x80
+
 	call quit

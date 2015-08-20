@@ -3,12 +3,15 @@
 	.equ CURLOPT_FOLLOWLOCATION, 52
 	.equ CURLOPT_WRITEHEADER, 10029
 	.equ CURLOPT_WRITEDATA, 10001
+	.equ CURLOPT_POST, 47
 	.equ CURLOPT_POSTFIELDS, 10015
 
 	.type send_post @function
 	.type write_data @function
 	n:
 		.ascii "\n"
+	example:
+		.ascii "my request"
 .section .bss
 	.lcomm curl, 4
 .section .text
@@ -26,7 +29,13 @@ send_post: # char* request, char* postdata
 	call curl_easy_setopt
 	addl $12, %esp
 
-	pushl 12(%ebp) # postdata
+	pushl $1
+	pushl $CURLOPT_POST
+	pushl curl
+	call curl_easy_setopt
+	addl $12, %esp
+
+	pushl $second_break # postdata
 	pushl $CURLOPT_POSTFIELDS
 	pushl curl
 	call curl_easy_setopt
@@ -57,6 +66,9 @@ send_post: # char* request, char* postdata
 		int $0x80
 	
 	endcurl:
+
+	pushl curl
+	call curl_easy_cleanup
 
 	movl %ebp, %esp
 	popl %ebp
