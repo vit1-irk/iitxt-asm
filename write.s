@@ -31,6 +31,8 @@
 		.long 0
 	subj_charcount: # аналогично в сабже
 		.long 0
+	restring:
+		.ascii "Re: "
 
 .section .bss
 	.lcomm currtime, 4 # текущий таймстамп
@@ -48,6 +50,20 @@
 .type openEditor @function
 .globl main
 .section .text
+
+need_Re:
+	movl $1, %eax
+	movl 4(%esp), %ebx
+	cmpl restring, %ebx
+
+	je equal
+	jne end
+	
+	equal:
+		movl $0, %eax
+	
+	end:
+	ret
 
 openEditor:
 	movl $editor_1, editor_args
@@ -256,7 +272,21 @@ main:
 		movl %eax, subj_charcount
 		movl subj_pointer, %ecx
 		subl %ecx, subj_charcount
+		
+		pushl subj_pointer
+		call need_Re
+		cmpl $0, %eax
+		je endwrite_Re
 
+		write_Re:
+			movl $4, %eax
+			movl file_descriptor, %ebx
+			movl $restring, %ecx
+			movl $4, %edx
+			int $0x80
+
+		endwrite_Re:
+		
 		movl $4, %eax
 		movl file_descriptor, %ebx
 		movl subj_pointer, %ecx
