@@ -1,4 +1,6 @@
 .include "ii-functions.s"
+# .include "b64.s"
+.include "network-functions.s"
 .section .data
 	filename:
 		.ascii "out/"
@@ -6,14 +8,17 @@
 		.byte 0
 		.endr
 	station:
-		.ascii "http://ii-net.tk/ii/ii-point.php?q=/u/point\0"
-	authstr:
-		.ascii "your_authstr\0"
+		.ascii "http://alicorn.tk/ii/ii-point.php?q=/u/point\0"
+	request_1:
+		.ascii "pauth=your_authstr&tmsg=\0"
 
 .section .bss
-	.lcomm file_descriptor, 4
 	.lcomm dirent, 266 # struct old_linux_dirent
+	.lcomm request_size, 4
+	.lcomm b64_size, 4
+	.lcomm b64_pointer, 4
 	.lcomm first_break, 4
+	.lcomm second_break, 4
 	
 # .type  @function
 .globl main
@@ -78,7 +83,53 @@ main:
 	int $0x80
 	
 	# теперь по адресу first_break находится нужный тосс, который нам отправлять
+	pushl first_break
+	call b64c
+	addl $4, %esp
+	
+	pushl $0
+	pushl %eax
+	pushl curl
+	call curl_easy_escape
+	addl $12, %esp
+	movl %eax, b64_pointer
+
+	pushl %eax
+	call strlen
+	addl $4, %esp
+	movl %eax, b64_size
+
+	pushl $request_1
+	call strlen
+	movl %eax, request_size
+	addl $4, %esp
+
+	movl b64_size, %ebx
+	addl request_size, %ebx
+
+	pushl %ebx
+	call get_memory
+	addl $4, %esp
+	
+	movl %eax, second_break
+	
+	# делаем подобное strcat
+	movl $request_1, %esi
+	movl $second_break, %edi
+	movl request_size, %ecx
+	rep movsb
+	
+	movl b64_pointer, %esi
+	movl $second_break, %edi
+	addl request_size, %edi
+	movl b64_size, %ecx
+	rep movsb
+
 	# продолжение следует
+	pushl $second_break
+	pushl $station
+	call send_post
+	addl $8, %esp
 
 	jmp reading_filenames # читаем дальше
 
