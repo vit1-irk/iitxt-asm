@@ -8,8 +8,14 @@
 		.ascii "sent/\0"
 	station:
 		.ascii "http://alicorn.tk/ii/ii-point.php?q=/u/point\0"
+	request_0:
+		.ascii "POST /ii/ii-point.php?q=/u/point HTTP/1.0\r\nHost: alicorn.tk\r\nUser-Agent: Mozilla/5.0 Linux i686\r\nReferrer: nobody.com\r\nContent-Length:       "
+		.equ req0_len, .-request_0
 	request_1:
 		.ascii "pauth=your_authstr&tmsg=\0"
+		.equ req1_len, .-request_1
+	full_size:
+		.long 0
 
 .section .bss
 	.lcomm dirent, 266 # struct old_linux_dirent
@@ -113,11 +119,12 @@ main:
 	call strlen
 	movl %eax, request_size
 	addl $4, %esp
-
+	
 	movl b64_size, %ebx
 	addl request_size, %ebx
 
 	pushl %ebx
+	movl %ebx, full_size
 	call get_memory # выделяем память для post-запроса
 	addl $4, %esp
 	
@@ -138,10 +145,7 @@ main:
 	rep movsb
 
 	# отправляем post-запрос
-	pushl second_break
-	pushl $station
 	call send_post
-	addl $8, %esp
 
 	# будем считать, что post сработал нормально
 	# теперь перемещаем сообщение из out/ в sent/
